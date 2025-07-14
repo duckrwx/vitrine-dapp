@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "outDir": "dist-node",
+    "module": "CommonJS", 
+    "target": "es2022",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true
+  },
+  "include": ["sensor/**/*.ts"]
+}
+
+
