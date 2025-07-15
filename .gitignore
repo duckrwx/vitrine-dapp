@@ -1,17 +1,42 @@
-node_modules
+# Arquivo de log do sistema
+*.log
+
+# Dependências do Node.js
+# Esta é a pasta mais importante para ser ignorada. Ela pode ter gigabytes!
+node_modules/
+
+# Arquivos de build do front-end
+# (Depende da sua ferramenta: Next.js, Vite, Create React App, etc.)
+.next/
+build/
+dist/
+.output
+.vite-cache
+
+# Arquivos gerados pelo Hardhat
+# Estes arquivos são gerados toda vez que você compila ou testa.
+artifacts/
+cache/
+coverage/
+coverage.json
+typechain-types/
+
+# Variáveis de ambiente
+# CRUCIAL para segurança. Nunca envie chaves privadas para o repositório.
 .env
+.env.*
+!.env.example
 
-# Hardhat files
-/cache
-/artifacts
+# Arquivos de log de dependências
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# TypeChain files
-/typechain
-/typechain-types
+# Arquivos de sistema operacional (macOS, Windows)
+.DS_Store
+Thumbs.db
 
-# solidity-coverage files
-/coverage
-/coverage.json
-
-# Hardhat Ignition default folder for deployments against a local node
-ignition/deployments/chain-31337
+# Configurações de editores de código
+.vscode/
+.idea/

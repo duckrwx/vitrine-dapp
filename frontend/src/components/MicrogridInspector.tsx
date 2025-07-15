@@ -1,51 +1,101 @@
 import { useState } from 'react';
 import { useSunest } from '../hooks/useContracts';
-import { formatEther } from 'viem';
+import { formatEther, parseEther } from 'viem'; // A sintaxe de parseEther mudou na v6 do viem/ethers
 import { normalize } from '../lib/strings';
 
-export default function MicrogridInspector () {
-  const { publicClient, address, abi } = useSunest();
-  const [city, setCity]       = useState('City');
-  const [country, setCountry] = useState('Country');
-  const [data, setData]       = useState<any>(null);
-  const countryClean = normalize(country);
-  const cityClean    = normalize(city);
+// 1. TIPO ATUALIZADO
+type MicrogridInfo = {
+  hash: string;
+  walletMetamask: string; // RENOMEADO AQUI
+  price: bigint;
+  latestKWh: bigint;
+};
 
-  async function fetch() {
-    const result = await publicClient.readContract({
-      address, abi,
-      functionName: 'microgridsByLocation',
-      args: [countryClean, cityClean]
-    });
-    setData(result);
+export default function MicrogridInspector() {
+  const { publicClient, address, abi } = useSunest();
+  const [city, setCity] = useState('Brasilia'); // Cidade de exemplo
+  const [country, setCountry] = useState('Brasil'); // País de exemplo
+
+  const [microgrids, setMicrogrids] = useState<MicrogridInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const countryClean = normalize(country);
+  const cityClean = normalize(city);
+
+  async function fetchMicrogrids() {
+    setIsLoading(true);
+    setError(null);
+    setMicrogrids([]);
+
+    try {
+      // A função no contrato retorna múltiplos arrays
+      const result = await publicClient.readContract({
+        address,
+        abi,
+        functionName: 'microgridsByLocation',
+        args: [countryClean, cityClean],
+      });
+
+      // 2. FORMATAÇÃO DOS DADOS ATUALIZADA
+      const formattedData: MicrogridInfo[] = result[0].map((hash, i) => ({
+        hash: hash,
+        walletMetamask: result[1][i], // RENOMEADO AQUI
+        price: result[2][i],
+        latestKWh: result[3][i],
+      }));
+
+      setMicrogrids(formattedData);
+    } catch (err) {
+      console.error("Erro ao buscar microgrids:", err);
+      setError("Falha ao buscar os dados. Verifique o console para mais detalhes.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-    <div className="p-4 border rounded-xl max-w-xl mx-auto">
-      <h2 className="text-xl font-semibold mb-2">Microgrids em {city}</h2>
-      <div className="flex gap-2 mb-3">
+    <div className="p-4 border rounded-xl max-w-xl mx-auto bg-white shadow">
+      <h2 className="text-xl font-semibold mb-3 text-gray-800">Inspecionar Microgrids</h2>
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input
-          value={country} onChange={e=>setCountry(e.target.value)}
-          className="border px-2 py-1 flex-1" placeholder="País"/>
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
+          className="border px-3 py-2 flex-1 rounded-md focus:ring-2 focus:ring-blue-500"
+          placeholder="País"
+        />
         <input
-          value={city} onChange={e=>setCity(e.target.value)}
-          className="border px-2 py-1 flex-1" placeholder="Cidade"/>
-        <button onClick={fetch} className="bg-blue-600 text-white px-4 rounded">
-          Buscar
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          className="border px-3 py-2 flex-1 rounded-md focus:ring-2 focus:ring-blue-500"
+          placeholder="Cidade"
+        />
+        <button
+          onClick={fetchMicrogrids}
+          disabled={isLoading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors duration-200 hover:bg-blue-700"
+        >
+          {isLoading ? 'Buscando...' : 'Buscar'}
         </button>
       </div>
 
-      {data && data[0].length === 0 && <p>Nenhum painel encontrado.</p>}
-      {data && data[0].map((hash:string, i:number)=>
-        <div key={hash} className="border p-2 mb-2 rounded">
-          <p><b>Hash:</b> {hash}</p>
-          <p><b>Wallet:</b> {data[1][i]}</p>
-          <p><b>Preço:</b> {formatEther(data[2][i])} ETH/op</p>
-          <p><b>Status:</b> {data[3][i] ? 'Ativo' : 'Inativo'}</p>
-          <p><b>Energia:</b> {data[4][i]} kWh</p>
-          <p><b>Capacidade:</b> {data[5][i]} GB</p>
-        </div>
+      {isLoading && <p className="text-center text-gray-500">Carregando dados...</p>}
+      {error && <p className="text-center text-red-600 bg-red-100 p-2 rounded-md">{error}</p>}
+      {!isLoading && !error && microgrids.length === 0 && (
+        <p className="text-center text-gray-500">Nenhum painel encontrado para esta localização.</p>
       )}
+
+      <div className="space-y-3 mt-4">
+        {microgrids.map((mg) => (
+          <div key={mg.hash} className="border p-4 rounded-lg bg-gray-50 text-sm">
+            <p className="font-semibold text-gray-700">Hash: <span className="text-xs break-all font-mono">{mg.hash}</span></p>
+            {/* 3. JSX ATUALIZADO */}
+            <p><b>Wallet MetaMask:</b> <span className="text-xs font-mono">{mg.walletMetamask}</span></p>
+            <p><b>Preço:</b> <span className="font-bold text-green-600">{formatEther(mg.price)} ETH/op</span></p>
+            <p><b>Energia Atual:</b> <span className="font-bold">{String(mg.latestKWh)} kWh</span></p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
