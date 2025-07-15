@@ -15,10 +15,8 @@ const config: HardhatUserConfig = {
       default: 1,
     },
   },
-  network: {
+  networks: {
     hardhat: {
-      // issue: https://github.com/sc-forks/solidity-coverage/issues/652,
-      // refer to : https://github.com/sc-forks/solidity-coverage/issues/652#issuecomment-896330136
       initialBaseFeePerGas: 0
     },
     localhost: {
@@ -32,7 +30,7 @@ const config: HardhatUserConfig = {
       accounts: ["0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"],
     },
     "cess-testnet": {
-      url: "https://testnet-rpc0.cess.cloud/ws/",
+      url: "wss://testnet-rpc.cess.network",
       chainId: 11330,
       accounts: {
       	mnemonic: "camp fork say cake indicate idea radar solve gesture news behind century"

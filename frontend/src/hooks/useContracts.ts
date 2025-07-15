@@ -1,6 +1,6 @@
 import { usePublicClient, useWalletClient } from 'wagmi';
 import SunestABI from '../abi/Sunest.json';
-import PoEABI from '../abi/PoE.json';
+import PoEABI    from '../abi/PoE.json';
 
 export function useSunest() {
   const { data: wallet } = useWalletClient();
