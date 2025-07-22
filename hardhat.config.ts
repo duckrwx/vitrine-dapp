@@ -21,7 +21,7 @@ const config: HardhatUserConfig = {
     },
     localhost: {
       url: "http://localhost:8545",
-      accounts: ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"],
+      
     },
     "cess-local": {
       url: "http://localhost:9944", // RPC endpoint of CESS testnet

@@ -1,22 +1,32 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import App from './App.tsx';
 import './index.css';
 
-import App from './App';
+import { BrowserRouter } from 'react-router-dom'; // <-- Importar
+import { WagmiProvider, createConfig } from 'wagmi';
+import { hardhat } from 'wagmi/chains';
+import { http } from 'viem';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { WagmiConfig, createConfig } from 'wagmi';
-import { publicClient, connector } from './lib/web3';
+const queryClient = new QueryClient();
 
 const config = createConfig({
-  publicClient,
-  connectors: [connector],
+  chains: [hardhat],
+  transports: {
+    [hardhat.id]: http(),
+  },
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <WagmiConfig config={config}>
-      <App />
-    </WagmiConfig>
-  </React.StrictMode>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        {/* Envelopa o App com o BrowserRouter */}
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </WagmiProvider>
+  </React.StrictMode>,
 );
-
