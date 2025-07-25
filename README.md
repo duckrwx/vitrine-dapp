@@ -1,4 +1,7 @@
 
+<img width="1024" height="1024" alt="VITRINE" src="https://github.com/user-attachments/assets/3872087c-7220-4bea-a0e4-3e40a4b605a7" />
+
+
 # 🎭 Vitrine – Your Decentralized Data Persona
 
 ** Vitrine is a Web3 platform where users transform their browsing data and interests into an AI-segmented, anonymous persona, stored decentrally on the CESS network. **
