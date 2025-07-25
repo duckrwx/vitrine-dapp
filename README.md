@@ -1,5 +1,5 @@
 
-<img width="1024" height="1024" alt="VITRINE" src="https://github.com/user-attachments/assets/3872087c-7220-4bea-a0e4-3e40a4b605a7" />
+<img width="300" height="200" alt="VITRINE" src="https://github.com/user-attachments/assets/3872087c-7220-4bea-a0e4-3e40a4b605a7" />
 
 
 # 🎭 Vitrine – Your Decentralized Data Persona
