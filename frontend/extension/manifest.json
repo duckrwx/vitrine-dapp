@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Vitrine Persona Builder",
+  "version": "0.1.0",
+  "description": "Ajuda a construir a sua persona de dados anónima para a plataforma Vitrine.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "history"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

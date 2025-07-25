@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vitrine</title>
+  <style>
+    body { font-family: sans-serif; width: 300px; padding: 15px; background-color: #111827; color: white; }
+    h1 { font-size: 1.1rem; text-align: center; margin-top: 0; }
+    hr { border-color: #374151; margin: 15px 0; }
+    .status-section { padding: 10px; background-color: #1f2937; border-radius: 8px; font-size: 0.9rem; }
+    .status-section p { margin: 0; color: #9ca3af; }
+    .status-section .value { color: #34d399; font-family: monospace; font-size: 0.8rem; word-break: break-all; }
+    .status-section .reputation { color: #2dd4bf; font-size: 1.2rem; font-weight: bold; }
+    input { width: 95%; padding: 5px; margin-top: 5px; background-color: #374151; border: 1px solid #4b5563; color: white; border-radius: 4px; }
+    button { width: 100%; padding: 8px; margin-top: 10px; background-color: #4f46e5; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    #status-message { font-size: 0.8rem; text-align: center; margin-top: 8px; height: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Painel Vitrine</h1>
+  <div id="userStatus" class="status-section" style="display: none;">
+    <p>Reputação:</p>
+    <p id="reputationValue" class="reputation">-- Pontos</p>
+    <p style="margin-top: 8px;">Hash da Persona:</p>
+    <p id="hashValue" class="value">--</p>
+  </div>
+  <p id="loadingStatus">A carregar...</p>
+  <hr>
+  <div>
+    <p style="font-size: 0.9rem;">O seu ID de Conexão:</p>
+    <input type="text" id="connectionIdInput" placeholder="Cole o ID da aplicação web">
+    <button id="saveButton">Guardar ID</button>
+    <div id="status-message"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
