@@ -1,56 +1,57 @@
-<p align="center">
-  <img src="https://googleusercontent.com/file_content/0" alt="Sunest Logo" width="400"/>
-</p>
 
-# ☀️ Sunest – Armazenamento Descentralizado com Energia Solar sob Demanda
+# 🎭 Vitrine – Your Decentralized Data Persona
 
-**Sunest é uma plataforma de armazenamento descentralizado que integra nós verdes — computadores que operam somente com energia solar, conectados a microgrids locais ou sistemas de compensação energética.**
+** Vitrine is a Web3 platform where users transform their browsing data and interests into an AI-segmented, anonymous persona, stored decentrally on the CESS network. **
 
-Nosso objetivo é transformar o modelo atual de infraestrutura blockchain e Web3, tornando-o energeticamente sustentável, economicamente acessível e inteligente em escala global.
+Our goal is to create a new paradigm for digital advertising, where companies can reach highly qualified audiences without ever accessing raw user data, and where users themselves are rewarded for contributing to a more ethical and efficient data ecosystem.
 
 ---
 
-## 🚀 Como Funciona
+## 🚀 How It Works
 
-Os painéis solares vinculados a microgrids fornecem energia para nós de armazenamento e consenso. A plataforma detecta os horários de pico solar e ativa apenas os nós disponíveis com energia limpa.
+ 1.Consented Data Collection: Through an on-platform form and a browser extension, users actively (declared) and passively (observed) provide their interests.
+ 2.Persona Creation: An AI engine on our backend processes and anonymizes this data, creating a rich, structured "persona" (a JSON file).
+ 3.Decentralized Storage: This persona is stored on the CESS network, ensuring its integrity and availability. Its unique FID (File ID) is saved in our backend's database.
+ 4.On-Chain Proof: The hash (the "digital fingerprint") of the persona is registered on our VitrineCore smart contract on an EVM blockchain, creating an immutable and auditable proof of existence.
+ 5.Attention Marketplace: Companies and sellers don't buy the data. Instead, they pay the platform to have their products and "livestreams" displayed to users with matching personas.
 
-Quando a geração solar de um nó estiver se encerrando, o sistema migra automaticamente os dados para outro nó verde em um fuso complementar (ex: Brasil → Japão), através da função `switchIfNeeded`.
+## 💡 Key Differentiators
 
-Toda a operação é registrada e validada por smart contracts, com distribuição automática dos valores de cada transação.
+* **👤 User Sovereignty:** Raw data is never exposed. The user is the owner of their persona and the value it generates.
+* **🎯 Ethical Advertising:** Companies can run highly targeted campaigns without violating user privacy.
+* **🏆 Reputation Economy:** Active participation (updating data, making purchases, giving feedback) builds reputation, which unlocks features and benefits on the platform.
+* **📢 Decentralized Social Commerce:** High-reputation users can become "streamers," promoting products and earning commissions that are instantly guaranteed and settled by smart contracts.
 
-## 💡 Diferenciais
-
-* **🔋 Energia sob demanda:** os nós funcionam apenas quando há energia solar disponível.
-* **🔐 Segurança com rastreabilidade total:** os dados são auditáveis e protegidos por blockchain.
-* **♻️ Sustentabilidade real:** sem dependência de energia contínua nem emissão de carbono.
-* **🌍 Distribuição global inteligente:** fluxo de dados acompanha os picos solares do planeta.
-
----
-
-## 🧱 Tecnologia
-
-* **Blockchain:** Contratos em Solidity no padrão EVM.
-* **Ambiente de Desenvolvimento:** Hardhat para compilação, testes e deploy.
-* **Frontend:** React (com Vite) e a biblioteca `wagmi` para interação com a blockchain.
-* **Armazenamento (Visão Futura):** Integração com a blockchain de armazenamento CESS.
 
 ---
 
-## 🛠️ Guia de Instalação e Execução Local
+## 🧱 Technology Stack
 
-Siga estes passos para rodar o projeto na sua máquina.
+* **Blockchain (Logic Layer): ** Smart contracts in Solidity (VitrineCore, Marketplace) on an EVM-compatible network.
+* **Blockchain (Storage Layer): ** CESS (Cumulus Encrypted Storage System) for decentralized persona storage.
+* **Backend: ** A Python API using FastAPI for business logic, AI processing, and multi-chain communication.
+* **Frontend: ** A React application (built with Vite) using the wagmi library for blockchain interaction.
+* **Database: ** SQLite (for the MVP) for indexing personas and products.
+* **Extension:** A Google Chrome extension for passive, consented data collection.
 
-### Pré-requisitos
+---
+
+## 🛠️ Local Installation and Setup Guide
+
+Follow these steps to run the project on your local machine.
+
+### Prerequisites
 
 1.  **Node.js**: Versão 18+ ou superior.
-2.  **pnpm**: Gerenciador de pacotes. Para instalar, rode: `npm install -g pnpm`.
-3.  **Carteira de Navegador**: MetaMask ou similar.
+2.  **pnpm**: npm install: `sudo apt-get npm` and then `npm install`. Package manager. Install via `npm i -g pnpm`
+3.  **Browser Wallet**: MetaMask ou similar.
+4.  **Python**: Version 3.10+ with a virtual environment (venv).
 
-### 1. Clonar o Repositório
+### 1. Clone the Repository
 ```bash
-git clone [https://github.com/duckrwx/sunest](https://github.com/duckrwx/sunest) # (Substitua pelo seu repositório, se for o caso)
-cd sunest
-###2. Instalar Dependências
+git clone https://github.com/duckrwx/vitrine-dapp.git # 
+cd vitrine-dapp
+###2. Install Dependencies
 Você precisa instalar as dependências tanto para o ambiente Hardhat (raiz) quanto para o frontend.
 ```
 2. Instalar Dependências
@@ -58,97 +59,84 @@ Você precisa instalar as dependências tanto para o ambiente Hardhat (raiz) qua
 
 ```Bash
 
-# Na pasta raiz (ex: ~/sunest)
+# In the root directory (for Hardhat)
 pnpm install
 
-# Na pasta do frontend
+# In the frontend directory
 cd frontend
 pnpm install
-cd .. # Volte para a raiz
+cd .. 
+
+# Set up the Python environment and install packages
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt 
 ```
-3. Configurar Variáveis de Ambiente
-O projeto utiliza dois arquivos .env. Crie-os baseando-se nos exemplos abaixo.
+3. Start the Services (4 Separate Terminals)
 
- Arquivo na Raiz: .env
-
- - Usado pelo Hardhat e pelos scripts de backend.
-
- - Crie o arquivo ~/sunest/.env e adicione:
+**Terminal 1: Local Blockchain**
 
 ```bash
 
-SUNEST_CONTRACT_ADDRESS="COLE_O_ENDERECO_DO_CONTRATO_AQUI"
+# In the root directory
+    pnpm hardhat node
+```
+**Terminal 2: Deploy contracts:**
+
+```bash
+
+ # In the root directory
+    pnpm hardhat run scripts/deploy.ts --network localhost
+```
+**Set Up Environment Variables**
+The project uses two `.env` files. Create them and fill in the addresses after deployment. They can be vizualized after the deploy.
+**Root Directory (`.env`):**
+
+```bash
+
+VITRINE_CORE_ADDRESS="..."
+MARKETPLACE_ADDRESS="..."
 DEPLOYER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+CESS_ACCOUNT_MNEMONIC="..."
 ```
 
- Arquivo no Frontend: frontend/.env.local
-
- - Usado pela aplicação React/Vite.
-
- - Crie o arquivo ~/sunest/frontend/.env.local e adicione:
+**Frontend Directory (`frontend/.env.local`):**
 
 ```bash
 
-VITE_SUNEST_ADDRESS="COLE_O_ENDERECO_DO_CONTRATO_AQUI"
-# VITE_POE_ADDRESS="COLE_O_ENDERECO_DO_POE_AQUI" # Se aplicável
+VITE_VITRINE_CORE_ADDRESS="..."
+VITE_MARKETPLACE_ADDRESS="..."
 VITE_CHAIN_ID=31337
 ```
 
-4. Iniciar a Blockchain e Fazer o Deploy
-Estes comandos precisam de terminais separados.
-
- - Terminal 1: Iniciar o Nó Local
+**Terminal 3: Backend Server**
 
 ```bash
 
-pnpm hardhat node
+# In the root directory
+    source venv/bin/activate
+    uvicorn main:app --reload
 ```
- - Terminal 2: Implantar os Contratos
+
+
+
+ **Terminal 4: Frontend Server**
 
 ```bash
 
-pnpm hardhat deploy --network localhost
-Após a execução, copie o endereço do contrato Sunest que apareceu no terminal e cole-o nos seus dois arquivos .env.
+# In the root directory
+    cd frontend
+    pnpm run dev
 ```
 
-5. Iniciar o Frontend
- - Terminal 3: Iniciar a Aplicação React
+ **Open the Application:** Navigate to `http://localhost:5173` in your browser.
 
-```bash
+### 💰 Business Model
+*   **Sales Commission:** The platform takes a small percentage of every successful sale on the marketplace.
+*   **Promotional Services ("Boosts"):** Sellers and streamers can pay a fee (in the platform's token) to boost the visibility of their products and livestreams to the most relevant personas.
 
-cd frontend
-pnpm run dev
-```
+### 🌞 Use Cases
+*   **Privacy-Preserving Targeted Marketing:** Companies can advertise to specific audiences without ever accessing their personal data.
+*   **User-Driven Data Monetization:** Users are rewarded with reputation and benefits for anonymously sharing their interests.
+*   **Decentralized Affiliate Marketing:** Streamers can promote products and receive commissions instantly and securely, guaranteed by the blockchain.
 
- Abra http://localhost:5173 (ou a porta indicada) no seu navegador.
-
-⚙️ Scripts Úteis para Desenvolvimento
- Para popular sua blockchain com dados de teste e simular atividade.
-
- - Registrar uma microgrid de teste:
-
-```bash
-
-pnpm hardhat run scripts/register-test-grid.ts --network localhost
-```
-
- - Iniciar o simulador de sensores:
-
-```bash
-
-node sensor-simulator.js
-```
-
-💰 Modelo Financeiro
-	- O microgrid recebe pelo fornecimento de energia + taxa de gestão.
-
-	- O operador do nó verde recebe o valor da operação menos os custos energéticos.
-
-	- A plataforma Sunest mantém uma taxa sobre cada operação bem-sucedida.
-
-🌞 Casos de Uso
-Armazenamento seguro de dados em horários de pico solar.
-
-	- Distribuição automatizada de dados sensíveis em regiões sustentáveis.
-
-	- Incentivo à adesão de operadores domésticos e microprodutores solares.
