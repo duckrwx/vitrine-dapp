@@ -1,4 +1,4 @@
-#!/home/v1clar3n/vitrine-dapp/venv/bin/python3
+#!/home/v1clar3n/Projetos-dapp/vitrine-dapp/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
