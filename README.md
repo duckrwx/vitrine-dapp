@@ -90,7 +90,7 @@ pip install -r requirements.txt
 
 ```bash
 
- # In the root directory
+ # In the root directory 
     pnpm hardhat run scripts/deploy.ts --network localhost
 ```
 **Set Up Environment Variables**
@@ -113,7 +113,11 @@ VITE_VITRINE_CORE_ADDRESS="..."
 VITE_MARKETPLACE_ADDRESS="..."
 VITE_CHAIN_ID=31337
 ```
-
+**Abi att
+```bash
+cp artifacts/contracts/Marketplace.sol/Marketplace.json frontend/src/abi/
+cp artifacts/contracts/VitrineCore.sol/VitrineCore.json frontend/src/abi/
+```
 **Terminal 3: Backend Server**
 
 ```bash
