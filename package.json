@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
+    "redis": "^5.7.0",
     "viem": "^2.31.7"
   }
 }

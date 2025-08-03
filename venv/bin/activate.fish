@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/v1clar3n/Projetos-dapp/vitrine-dapp/venv
+set -gx VIRTUAL_ENV /home/v1clar3n/Projetos-dapp/New/vitrine-dapp/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

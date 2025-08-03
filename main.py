@@ -1,149 +1,458 @@
 import os
 import json
-import tempfile
-import time
-import uuid
-import datetime
-import shutil
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import List, Optional, Dict
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from web3 import Web3
-import spacy
+import redis
+import httpx
 import requests
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile, Request
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional, Dict, List
+from datetime import datetime, timedelta
+from pydantic import BaseModel
+import logging
+import asyncio
+from dotenv import load_dotenv
 
-import database
-from database import SessionLocal, engine
+# Carrega variáveis de ambiente do arquivo .env
+load_dotenv()
 
-database.create_db_and_tables()
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# --- Configuração ---
-load_dotenv(); app = FastAPI(); origins = ["*"]; app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"]);
-app.mount("/static", StaticFiles(directory="static"), name="static")
-nlp = spacy.load("en_core_web_sm"); CATEGORIES = {"Technology": ["blockchain", "ai", "software", "crypto"], "Finance": ["investing", "stocks", "finance"]};
-def process_with_ai(data: dict) -> dict:
-    interests_text = " ".join(data.get("interests", [])); doc = nlp(interests_text.lower()); detected_categories = set()
-    for token in doc:
-        for category, keywords in CATEGORIES.items():
-            if token.lemma_ in keywords: detected_categories.add(category)
-    persona = {"profile": {"ageRange": data.get("ageRange"), "favoriteBrands": data.get("favoriteBrands", [])},"interests": {"declared": data.get("interests", []), "inferred_categories": list(detected_categories)},"purchase_intent": data.get("purchaseIntent", []),"version": 1.0}
-    return persona
-HARDHAT_NODE_URL = "http://127.0.0.1:8545"; w3 = Web3(Web3.HTTPProvider(HARDHAT_NODE_URL)); BACKEND_PRIVATE_KEY = os.getenv("DEPLOYER_PRIVATE_KEY"); CORE_CONTRACT_ADDRESS = os.getenv("VITRINE_CORE_ADDRESS"); MARKETPLACE_ADDRESS = os.getenv("MARKETPLACE_ADDRESS")
-if not BACKEND_PRIVATE_KEY or not CORE_CONTRACT_ADDRESS or not MARKETPLACE_ADDRESS: raise ValueError("Erro Crítico: Variáveis de ambiente não encontradas")
-owner_account = w3.eth.account.from_key(BACKEND_PRIVATE_KEY)
-with open('./artifacts/contracts/VitrineCore.sol/VitrineCore.json') as f: core_abi = json.load(f)['abi']
-with open('./artifacts/contracts/Marketplace.sol/Marketplace.json') as f: marketplace_abi = json.load(f)['abi']
-core_contract = w3.eth.contract(address=CORE_CONTRACT_ADDRESS, abi=core_abi)
-marketplace_contract = w3.eth.contract(address=MARKETPLACE_ADDRESS, abi=marketplace_abi)
-CESS_GATEWAY_URL = "https://deoss-sgp.cess.network"
+# Modelos de dados
+class ProductMetadata(BaseModel):
+    name: str
+    description: str
+    price: str
+    commission: str
+    tags: List[str]
+    image_fid: str
+    image_url: str
+    created_at: str
+    version: str = "1.0"
 
-# --- FUNÇÃO DE UPLOAD CORRIGIDA PARA USAR /file ---
-def upload_to_cess(data_to_upload: bytes, filename: str) -> Optional[str]:
-    print(f"\n--- A FAZER UPLOAD DO FICHEIRO '{filename}' PARA A CESS (VIA /file) ---")
+class CachedProduct(BaseModel):
+    id: int
+    seller: str
+    price: str
+    commission: str
+    metadata_fid: str
+    metadata: Optional[ProductMetadata] = None
+    cached_at: Optional[datetime] = None
+    image_url: str = ""
+
+# Configuração
+app = FastAPI(title="Vitrine DApp API")
+
+# CORS
+origins = ["*"] 
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=origins, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
+
+# Configurações CESS
+CESS_GATEWAY_URL = os.getenv("CESS_GATEWAY_URL", "https://deoss-sgp.cess.network")
+CESS_TERRITORY = os.getenv("CESS_TERRITORY", "Vitrine")
+CESS_ACCOUNT = os.getenv("CESS_ACCOUNT", "cXh4NNAZKCtTEhZxVkJyBPcuHLV2WBqR89b2p6jQe4SyooFgc")
+CESS_MESSAGE = os.getenv("CESS_MESSAGE", "abacate123")
+CESS_SIGNATURE = os.getenv("CESS_SIGNATURE", "0x66ff396cc266c8531b77fa253b42e8d18cbdde65ca46afa76a2d98c8ea720f056f67c3b8c5449bf0dbb73404cec8d1683f66228b64cbf4e4ddd5ee36d104298b")
+
+# Redis
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+METADATA_CACHE_TTL = 24 * 60 * 60  # 24 horas
+
+try:
+    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()
+    logger.info("Redis conectado com sucesso")
+except Exception as e:
+    logger.warning(f"Redis não disponível, usando cache em memória: {e}")
+    redis_client = None
+
+# Cache em memória como fallback
+memory_cache: Dict[str, tuple[str, datetime]] = {}
+
+# Rate limiting simples
+upload_attempts = {}
+RATE_LIMIT_REQUESTS = 10
+RATE_LIMIT_WINDOW = 60  # segundos
+
+def check_rate_limit(client_ip: str) -> bool:
+    """Verifica rate limiting simples"""
+    now = datetime.now()
+    
+    # Limpar entradas antigas
+    for ip in list(upload_attempts.keys()):
+        upload_attempts[ip] = [t for t in upload_attempts[ip] if now - t < timedelta(seconds=RATE_LIMIT_WINDOW)]
+        if not upload_attempts[ip]:
+            del upload_attempts[ip]
+    
+    # Verificar limite
+    if client_ip in upload_attempts:
+        if len(upload_attempts[client_ip]) >= RATE_LIMIT_REQUESTS:
+            return False
+    
+    # Registrar tentativa
+    if client_ip not in upload_attempts:
+        upload_attempts[client_ip] = []
+    upload_attempts[client_ip].append(now)
+    
+    return True
+
+class MetadataCache:
+    """Sistema de cache focado em metadados JSON"""
+    
+    @staticmethod
+    def _get_cache_key(metadata_fid: str) -> str:
+        return f"vitrine:metadata:{metadata_fid}"
+    
+    @staticmethod
+    async def get(metadata_fid: str) -> Optional[Dict]:
+        """Busca metadados do cache"""
+        cache_key = MetadataCache._get_cache_key(metadata_fid)
+        
+        # Tenta Redis primeiro
+        if redis_client:
+            try:
+                cached_data = redis_client.get(cache_key)
+                if cached_data:
+                    logger.info(f"Cache hit (Redis): {metadata_fid}")
+                    return json.loads(cached_data)
+            except Exception as e:
+                logger.error(f"Erro ao buscar do Redis: {e}")
+        
+        # Fallback para memória
+        if cache_key in memory_cache:
+            data, expiry = memory_cache[cache_key]
+            if datetime.now() < expiry:
+                logger.info(f"Cache hit (Memory): {metadata_fid}")
+                return json.loads(data)
+            else:
+                del memory_cache[cache_key]
+        
+        logger.info(f"Cache miss: {metadata_fid}")
+        return None
+    
+    @staticmethod
+    async def set(metadata_fid: str, metadata: Dict):
+        """Armazena metadados no cache"""
+        cache_key = MetadataCache._get_cache_key(metadata_fid)
+        json_data = json.dumps(metadata)
+        
+        # Salva no Redis
+        if redis_client:
+            try:
+                redis_client.setex(cache_key, METADATA_CACHE_TTL, json_data)
+                logger.info(f"Cached to Redis: {metadata_fid}")
+            except Exception as e:
+                logger.error(f"Erro ao salvar no Redis: {e}")
+        
+        # Sempre salva na memória como backup
+        expiry = datetime.now() + timedelta(seconds=METADATA_CACHE_TTL)
+        memory_cache[cache_key] = (json_data, expiry)
+        
+        # Limita tamanho do cache em memória
+        if len(memory_cache) > 1000:
+            oldest_key = min(memory_cache.keys(), 
+                           key=lambda k: memory_cache[k][1])
+            del memory_cache[oldest_key]
+    
+    @staticmethod
+    async def fetch_from_cess(metadata_fid: str) -> Optional[Dict]:
+        """Busca metadados diretamente do CESS"""
+        try:
+            url = f"{CESS_GATEWAY_URL}/file/download/{metadata_fid}"
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                
+                # Parse JSON
+                metadata = response.json()
+                
+                # Adiciona URL direta da imagem se não existir
+                if "image_fid" in metadata and "image_url" not in metadata:
+                    metadata["image_url"] = f"{CESS_GATEWAY_URL}/file/download/{metadata['image_fid']}"
+                
+                return metadata
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro HTTP ao buscar do CESS: {e.response.status_code}")
+            raise HTTPException(status_code=404, detail=f"Metadados não encontrados: {metadata_fid}")
+        except Exception as e:
+            logger.error(f"Erro ao buscar metadados do CESS: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao buscar metadados")
+
+# Endpoint principal de upload
+@app.post("/api/upload-to-cess")
+async def upload_proxy_to_cess(request: Request, file: UploadFile = File(...)):
+    """
+    Atua como um proxy seguro. Recebe um ficheiro do cliente,
+    faz o upload para a CESS usando as chaves do servidor e devolve o FID.
+    """
+    # Rate limiting
+    client_ip = request.client.host
+    if not check_rate_limit(client_ip):
+        logger.warning(f"Rate limit excedido para IP: {client_ip}")
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas requisições. Por favor, aguarde antes de tentar novamente."
+        )
+    
+    logger.info(f"\n--- RECEBENDO ARQUIVO '{file.filename}' PARA UPLOAD PROXY ---")
+    
     try:
+        # Validações básicas
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        file_bytes = await file.read()
+        
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Arquivo muito grande. Máximo permitido: {MAX_FILE_SIZE / 1024 / 1024}MB"
+            )
+        
+        if len(file_bytes) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Arquivo vazio não é permitido"
+            )
+        
+        # Headers para CESS
         headers = {
-            'Territory': "Vitrine",
-            'Account': "cXh4NNAZKCtTEhZxVkJyBPcuHLV2WBqR89b2p6jQe4SyooFgc",
-            'Message': "abacate123",
-            'Signature': "0x66ff396cc266c8531b77fa253b42e8d18cbdde65ca46afa76a2d98c8ea720f056f67c3b8c5449bf0dbb73404cec8d1683f66228b64cbf4e4ddd5ee36d104298b",
+            'Territory': CESS_TERRITORY,
+            'Account': CESS_ACCOUNT,
+            'Message': CESS_MESSAGE,
+            'Signature': CESS_SIGNATURE,
         }
         
+        # Upload para CESS
         upload_url = f"{CESS_GATEWAY_URL}/file"
         files_payload = {
-            'file': (filename, data_to_upload, 'application/octet-stream')
+            'file': (file.filename, file_bytes, file.content_type)
         }
         
-        response = requests.put(upload_url, headers=headers, files=files_payload)
+        logger.info(f"Enviando para CESS: {file.filename} ({len(file_bytes)} bytes)")
+        
+        response = requests.put(upload_url, headers=headers, files=files_payload, timeout=30)
         response.raise_for_status()
         
-        # A resposta do endpoint /file é apenas o FID como texto
-        file_id = response.text.strip('"')
+        response_json = response.json()
+        file_id = response_json.get("data", {}).get("fid")
         
         if not file_id:
-            raise ValueError("Resposta do servidor vazia.")
-
-        print(f"✅ Upload para CESS bem-sucedido! FID: {file_id}")
-        return file_id
+            logger.error(f"FID não encontrado na resposta: {response.text}")
+            raise ValueError(f"O campo 'fid' não foi encontrado na resposta da CESS: {response.text}")
+        
+        logger.info(f"✅ Upload proxy para CESS bem-sucedido! FID retornado: {file_id}")
+        
+        return {"fid": file_id}
+        
+    except requests.exceptions.Timeout:
+        logger.error("Timeout ao comunicar com CESS")
+        raise HTTPException(
+            status_code=504,
+            detail="Timeout ao comunicar com servidor CESS"
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erro de rede: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Erro ao comunicar com servidor CESS"
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ Erro no upload para a CESS: {e}")
-        if 'response' in locals():
-            print(f"   Resposta do servidor: {response.status_code} - {response.text}")
-        return None
+        logger.error(f"❌ Erro no upload proxy para a CESS: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-def get_db():
-    db = SessionLocal();
-    try: yield db
-    finally: db.close()
+@app.get("/api/metadata/{fid}")
+async def get_metadata(fid: str):
+    """
+    Endpoint para buscar metadados do CESS
+    """
+    try:
+        # Primeiro verifica o cache
+        cached = await MetadataCache.get(fid)
+        if cached:
+            return cached
+        
+        # Se não está em cache, busca do CESS
+        metadata = await MetadataCache.fetch_from_cess(fid)
+        
+        # Salva no cache para próximas requisições
+        await MetadataCache.set(fid, metadata)
+        
+        return metadata
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao buscar metadados: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao buscar metadados")
 
-# --- Endpoints da Persona e Extensão (sem alterações) ---
-# ... (os seus endpoints existentes de persona, link_extension, etc., continuam aqui)
-
-# --- Endpoints do Marketplace ---
-@app.post("/api/upload/image")
-async def upload_image(file: UploadFile = File(...)):
-    os.makedirs("static/images", exist_ok=True)
-    file_extension = os.path.splitext(file.filename)[1]
-    unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = os.path.join("static/images", unique_filename)
+@app.get("/api/products/batch")
+async def get_products_batch(
+    ids: str,  # IDs separados por vírgula: "0,1,2,3"
+    background_tasks: BackgroundTasks
+):
+    """
+    Busca múltiplos produtos de uma vez (otimizado para listas)
+    """
+    product_ids = [int(id.strip()) for id in ids.split(",") if id.strip()]
+    products = []
     
-    image_bytes = await file.read() # Lê os bytes do ficheiro em memória
+    # Tasks assíncronas para buscar em paralelo
+    async def fetch_product(product_id: int):
+        try:
+            # Simula dados do contrato
+            metadata_fid = f"mock-metadata-{product_id}"
+            
+            # Tenta cache primeiro
+            metadata = await MetadataCache.get(metadata_fid)
+            
+            if not metadata:
+                # Busca do CESS se não estiver em cache
+                metadata = await MetadataCache.fetch_from_cess(metadata_fid)
+                # Agenda cache em background
+                background_tasks.add_task(MetadataCache.set, metadata_fid, metadata)
+            
+            return {
+                "id": product_id,
+                "seller": f"0x{'0' * 38}{product_id:02d}",
+                "price": metadata.get("price", "0"),
+                "commission": metadata.get("commission", "0"),
+                "metadata": metadata,
+                "image_url": metadata.get("image_url", "")
+            }
+        except Exception as e:
+            logger.error(f"Erro ao buscar produto {product_id}: {e}")
+            return None
     
-    with open(file_path, "wb") as buffer:
-        buffer.write(image_bytes)
+    # Busca todos em paralelo
+    tasks = [fetch_product(pid) for pid in product_ids]
+    results = await asyncio.gather(*tasks)
     
-    image_hash = w3.keccak(image_bytes).hex()
-
+    # Filtra resultados válidos
+    products = [p for p in results if p is not None]
+    
     return {
-        "image_url": f"/static/images/{unique_filename}",
-        "image_hash": image_hash
+        "products": products,
+        "total": len(products),
+        "requested": len(product_ids)
     }
 
-class ProductMetadata(BaseModel):
-    name: str; description: str; price: str; commission: str; tags: List[str]; image_url: str; image_hash: str
+@app.post("/api/cache/invalidate/{metadata_fid}")
+async def invalidate_cache(metadata_fid: str):
+    """
+    Invalida cache de um metadata específico
+    """
+    cache_key = MetadataCache._get_cache_key(metadata_fid)
+    
+    # Remove do Redis
+    if redis_client:
+        try:
+            redis_client.delete(cache_key)
+        except Exception as e:
+            logger.error(f"Erro ao invalidar Redis: {e}")
+    
+    # Remove da memória
+    if cache_key in memory_cache:
+        del memory_cache[cache_key]
+    
+    return {"status": "invalidated", "metadata_fid": metadata_fid}
 
-@app.post("/api/products/prepare_metadata")
-async def prepare_metadata(data: ProductMetadata):
-    print("\n--- A PREPARAR METADATOS DO PRODUTO ---")
-    metadata_json_string = data.model_dump_json(indent=2)
+@app.get("/api/cache/stats")
+async def cache_stats():
+    """
+    Estatísticas do cache
+    """
+    stats = {
+        "memory_cache_size": len(memory_cache),
+        "redis_available": redis_client is not None
+    }
     
-    # Agora esta função chama a versão correta do upload_to_cess
-    metadata_fid = upload_to_cess(metadata_json_string.encode('utf-8'), "metadata.json")
+    if redis_client:
+        try:
+            info = redis_client.info()
+            stats["redis_memory_used"] = info.get("used_memory_human", "N/A")
+            stats["redis_total_keys"] = redis_client.dbsize()
+            
+            # Conta apenas chaves do Vitrine
+            vitrine_keys = 0
+            for key in redis_client.scan_iter(match="vitrine:*"):
+                vitrine_keys += 1
+            stats["vitrine_cached_items"] = vitrine_keys
+        except:
+            pass
     
-    if not metadata_fid:
-        raise HTTPException(status_code=500, detail="Falha ao fazer upload dos metadatos para a CESS.")
-    
-    return {"metadata_fid": metadata_fid}
+    return stats
 
-# --- Lógica da API Principal (Persona) ---
-class PersonaData(BaseModel):
-    interests: List[str]; purchaseIntent: List[str]; ageRange: Optional[str] = None; favoriteBrands: List[str]
-@app.post("/api/persona/update")
-async def update_persona(data: PersonaData, user_address: str, db: Session = Depends(get_db)):
-    # Este endpoint agora usa a função de upload de ficheiro correta
-    persona_dict = process_with_ai(data.model_dump())
-    persona_json_string = json.dumps(persona_dict, sort_keys=True)
-    object_name = f"persona_{user_address}.json"
-    file_id = upload_to_cess(persona_json_string.encode('utf-8'), object_name)
-    if not file_id:
-        raise HTTPException(status_code=500, detail="Falha no upload da persona para a CESS.")
+@app.get("/api/health")
+async def health_check():
+    """Health check com status dos serviços"""
     
-    # ... (resto da lógica de blockchain e DB)
-    persona_hash = w3.keccak(text=persona_json_string)
+    # Verifica CESS
+    cess_healthy = False
     try:
-        nonce = w3.eth.get_transaction_count(owner_account.address)
-        tx_data = core_contract.functions.updatePersonaHash(user_address, persona_hash).build_transaction({'from': owner_account.address, 'nonce': nonce})
-        signed_tx = w3.eth.account.sign_transaction(tx_data, private_key=BACKEND_PRIVATE_KEY); tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-        tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash); on_chain_hash_hex = tx_receipt.transactionHash.hex()
-        rep_tx_data = core_contract.functions.updateUserReputation(user_address, 10).build_transaction({'from': owner_account.address, 'nonce': nonce + 1})
-        signed_rep_tx = w3.eth.account.sign_transaction(rep_tx_data, private_key=BACKEND_PRIVATE_KEY); rep_tx_hash = w3.eth.send_raw_transaction(signed_rep_tx.raw_transaction)
-        w3.eth.wait_for_transaction_receipt(rep_tx_hash)
-        db_persona = db.query(database.Persona).filter(database.Persona.user_address == user_address).first()
-        if not db_persona: db_persona = database.Persona(user_address=user_address); db.add(db_persona)
-        db_persona.cess_fid = file_id; db_persona.on_chain_hash = on_chain_hash_hex; db_persona.updated_at = datetime.datetime.utcnow(); db.commit()
-        return {"status": "success", "tx_hash": on_chain_hash_hex, "cess_fid": file_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.head(CESS_GATEWAY_URL)
+            cess_healthy = response.status_code < 500
+    except:
+        pass
+    
+    # Verifica Redis
+    redis_healthy = False
+    if redis_client:
+        try:
+            redis_client.ping()
+            redis_healthy = True
+        except:
+            pass
+    
+    return {
+        "status": "healthy",
+        "services": {
+            "cess": cess_healthy,
+            "redis": redis_healthy,
+            "memory_cache": True
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/")
+async def root():
+    """Endpoint raiz"""
+    return {
+        "message": "Vitrine DApp API funcionando!",
+        "version": "2.0",
+        "endpoints": {
+            "upload": "/api/upload-to-cess",
+            "metadata": "/api/product/{product_id}/metadata",
+            "batch": "/api/products/batch",
+            "health": "/api/health",
+            "cache_stats": "/api/cache/stats"
+        }
+    }
+
+# Middleware para logging
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = datetime.now()
+    response = await call_next(request)
+    process_time = (datetime.now() - start_time).total_seconds()
+    
+    logger.info(
+        f"{request.client.host} - {request.method} {request.url.path} "
+        f"- {response.status_code} - {process_time:.3f}s"
+    )
+    
+    return response
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
