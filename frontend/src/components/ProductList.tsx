@@ -1,6 +1,9 @@
+// ProductList.jsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useContractRead } from 'wagmi';
 import marketplaceAbi from '../abi/Marketplace.json';
+import { Link } from 'react-router-dom';
 
 // Hook para buscar um produto específico do contrato
 const useProduct = (productId: number) => {
@@ -236,7 +239,13 @@ const ProductCard = ({ productId }) => {
         {/* Botões de Ação */}
         <div className="flex gap-2">
           <button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors duration-200 font-medium">
-            Ver Detalhes
+            <Link 
+              to={`/product/${id}`} // Use backticks (`) para inserir a variável 'id' na string
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition-colors duration-200 font-medium text-center" // Adicionei text-center para garantir o alinhamento
+              title="Ver detalhes do produto"
+            >
+              Ver Detalhes
+            </Link>
           </button>
           <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded transition-colors duration-200" title="Salvar">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,3 +373,4 @@ export default function ProductList() {
     </div>
   );
 }
+

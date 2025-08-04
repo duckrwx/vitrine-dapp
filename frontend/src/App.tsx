@@ -1,3 +1,5 @@
+// App.tsx
+
 import React from 'react';
 import { Routes, Route, Link, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
@@ -8,7 +10,10 @@ import MarketplacePage from './pages/MarketplacePage';
 import SuccessPage from './pages/SuccessPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ConnectWallet from './components/ConnectWallet';
+import ProductInterface from './pages/ProductInterface';
+import Seed from './pages/Seed';
 import { useAccount } from 'wagmi';
+import CreatorDashboard from './pages/CreatorDashboard'; // NOVO
 
 export default function App() {
   const { isConnected } = useAccount();
@@ -31,6 +36,9 @@ export default function App() {
           <Route path="/dashboard/update" element={<ProtectedRoute><UpdatePersonaPage /></ProtectedRoute>} />
           <Route path="/dashboard/register-product" element={<ProtectedRoute><RegisterProductPage /></ProtectedRoute>} />
           <Route path="/success" element={<ProtectedRoute><SuccessPage /></ProtectedRoute>} />
+          <Route path="/product/:id" element={<ProtectedRoute><ProductInterface /></ProtectedRoute>} />
+          <Route path="/product/:id/seed" element={<ProtectedRoute><Seed /></ProtectedRoute>} />
+          <Route path="/creator-dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to={isConnected ? "/marketplace" : "/"} />} />
         </Routes>
       </div>
