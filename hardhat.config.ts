@@ -1,42 +1,63 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-ethers";
-import "hardhat-deploy";
-import 'dotenv/config';
+import "@nomiclabs/hardhat-ethers";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.20",
-  defaultNetwork: "hardhat",
-  namedAccounts: {
-    deployer: {
-      default: 0,
-    },
-    beneficiary: {
-      default: 1,
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
     },
   },
   networks: {
     hardhat: {
-      initialBaseFeePerGas: 0
+      chainId: 31337,
+      accounts: {
+        count: 10,
+        accountsBalance: "10000000000000000000000", // 10,000 ETH per account
+      },
     },
     localhost: {
-      url: "http://localhost:8545",
-      
+      url: "http://127.0.0.1:8545",
+      chainId: 31337,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
-    "cess-local": {
-      url: "http://localhost:9944", // RPC endpoint of CESS testnet
-      chainId: 11330,
-      // private key of `//Alice` from Substrate
-      accounts: ["0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"],
+    // Add other networks as needed
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || "",
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      chainId: 11155111,
     },
-    "cess-testnet": {
-      url: "wss://testnet-rpc.cess.network",
-      chainId: 11330,
-      accounts: {
-      	mnemonic: "camp fork say cake indicate idea radar solve gesture news behind century"
-      },
-    }
-  }
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL || "",
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      chainId: 1,
+    },
+  },
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS !== undefined,
+    currency: "USD",
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
+  },
+  typechain: {
+    outDir: "typechain-types",
+    target: "ethers-v5",
+  },
 };
 
 export default config;

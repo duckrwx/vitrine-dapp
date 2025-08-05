@@ -1,31 +1,56 @@
 {
-  "name": "sunest",
+  "name": "vitrine-dapp",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Vitrine dApp - Decentralized advertising platform",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.ts --network localhost",
+    "copy-abi": "node scripts/copy-abi.js",
+    "build-contracts": "npm run compile && npm run copy-abi",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "source venv/bin/activate && uvicorn main:app --reload",
+    "dev:full": "concurrently \"npm run node\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "setup": "npm install && cd frontend && npm install && cd .. && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
+    "lint": "cd frontend && npm run lint",
+    "build": "npm run build-contracts && cd frontend && npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "web3",
+    "dapp",
+    "advertising",
+    "privacy",
+    "decentralized",
+    "ethereum",
+    "react",
+    "fastapi"
+  ],
+  "author": "Vitrine dApp Team",
+  "license": "MIT",
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.0.9",
-    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
-    "@types/node": "^24.0.13",
-    "dotenv": "^17.2.0",
-    "ethers": "^6.15.0",
-    "hardhat": "^2.25.0",
-    "hardhat-deploy": "^1.0.4",
-    "minimist": "^1.2.8",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-etherscan": "^3.1.7",
+    "@typechain/ethers-v5": "^10.1.0",
+    "@typechain/hardhat": "^6.1.2",
+    "chai": "^4.2.0",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.1.0",
+    "typescript": ">=4.5.0",
+    "concurrently": "^8.2.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0",
-    "chart.js": "^4.5.0",
-    "react-chartjs-2": "^5.3.0",
-    "redis": "^5.7.0",
-    "viem": "^2.31.7"
+    "@openzeppelin/contracts": "^4.9.0",
+    "dotenv": "^16.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

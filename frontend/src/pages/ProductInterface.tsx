@@ -1,8 +1,11 @@
+//ProductInterface.js
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import ProductCard from '../components/ProductCard';
 import CreatorList from '../components/CreatorList';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 
 export default function ProductInterface() {
   const { productId } = useParams();
@@ -51,15 +54,15 @@ export default function ProductInterface() {
                     Crie seu link de afiliado e comece a ganhar comissões
                   </p>
                 </div>
-                <button
-                  onClick={handleBecomeCreator}
+              <Link
+                  to={`/product/${productId}/seed`}
                   className="px-6 py-3 bg-white text-green-700 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Tornar-se Criador
-                </button>
+                  <span>Tornar-se Criador</span>
+                </Link>
               </div>
             </div>
           </div>
